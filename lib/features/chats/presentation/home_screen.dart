@@ -1,4 +1,4 @@
-import 'package:firebase_auth/firebase_auth.dart';
+﻿import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/widgets/user_avatar.dart';
@@ -8,6 +8,8 @@ import '../data/chat_list.dart';
 import '../data/chat_repository.dart';
 import 'chat_screen.dart';
 import 'users_screen.dart';
+import '../../calls/data/call_repository.dart';
+import '../../calls/presentation/incoming_call_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -30,6 +32,17 @@ class HomeScreen extends ConsumerWidget {
     final chats = ref.watch(chatListProvider);
     final users = ref.watch(usersProvider).value ?? <AppUser>[];
     final myUid = FirebaseAuth.instance.currentUser!.uid;
+          ref.listen<AsyncValue<Call?>>(incomingCallProvider, (prev, next) {
+        final call = next.value;
+        if (call != null && prev?.value?.id != call.id) {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              fullscreenDialog: true,
+              builder: (_) => IncomingCallScreen(call: call),
+            ),
+          );
+        }
+      });
 
     return Scaffold(
       appBar: AppBar(

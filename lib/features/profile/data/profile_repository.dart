@@ -23,6 +23,7 @@ class ProfileRepository {
     await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
       'name': name,
       'bio': bio,
+      'email': FieldValue.delete(),
       'photoB64': ?photoB64,
     }, SetOptions(merge: true));
   }

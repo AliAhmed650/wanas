@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/widgets/user_avatar.dart';
 import '../data/chat_repository.dart';
+import '../../calls/data/call_repository.dart';
+import '../../calls/presentation/call_screen.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   const ChatScreen({super.key, required this.other});
@@ -65,6 +67,25 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       text: text,
     );
   }
+    Future<void> _startCall(bool video) async {
+      final me = FirebaseAuth.instance.currentUser!;
+      final callId = await ref.read(callRepositoryProvider).startCall(
+            calleeId: widget.other.uid,
+            callerName: me.displayName ?? 'مستخدم',
+            video: video,
+          );
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => CallScreen(
+            callId: callId,
+            otherName: widget.other.name,
+            video: video,
+            isCaller: true,
+          ),
+        ),
+      );
+    }
 
   String _time(DateTime? t) {
     if (t == null) return '';
@@ -104,6 +125,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     return Scaffold(
       appBar: AppBar(
+                actions: [
+          IconButton(
+            icon: const Icon(Icons.call),
+            onPressed: () => _startCall(false),
+          ),
+          IconButton(
+            icon: const Icon(Icons.videocam),
+            onPressed: () => _startCall(true),
+          ),
+        ],
         title: Row(
           children: [
             UserAvatar(

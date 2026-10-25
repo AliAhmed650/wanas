@@ -1,4 +1,4 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+﻿import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -14,15 +14,13 @@ class AuthRepository {
 
   Future<void> signUp(String name, String email, String password) async {
     final cred = await _auth.createUserWithEmailAndPassword(
-      email: email,
-      password: password,
-    );
+        email: email, password: password);
     final user = cred.user!;
     await user.updateDisplayName(name);
+    // الإيميل مش بيتخزّن في Firestore (خصوصية)، بيفضل في Authentication بس
     await _db.collection('users').doc(user.uid).set({
       'uid': user.uid,
       'name': name,
-      'email': email,
       'bio': '',
       'photoUrl': null,
       'createdAt': FieldValue.serverTimestamp(),
