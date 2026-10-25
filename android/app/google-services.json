@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "833420099140",
+    "project_id": "wanas-chat-ali",
+    "storage_bucket": "wanas-chat-ali.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:833420099140:android:f701bf7a1e7b175f160611",
+        "android_client_info": {
+          "package_name": "com.aliahmed.wanas"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAze6YGNyRJshCpngC4Ip8u4izmKldRhRM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

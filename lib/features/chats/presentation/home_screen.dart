@@ -1,0 +1,109 @@
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/widgets/user_avatar.dart';
+import '../../auth/data/auth_repository.dart';
+import '../../profile/presentation/profile_screen.dart';
+import '../data/chat_list.dart';
+import '../data/chat_repository.dart';
+import 'chat_screen.dart';
+import 'users_screen.dart';
+
+class HomeScreen extends ConsumerWidget {
+  const HomeScreen({super.key});
+
+  String _time(DateTime? t) {
+    if (t == null) return '';
+    final now = DateTime.now();
+    final sameDay =
+        t.year == now.year && t.month == now.month && t.day == now.day;
+    if (sameDay) {
+      final h = t.hour.toString().padLeft(2, '0');
+      final m = t.minute.toString().padLeft(2, '0');
+      return '$h:$m';
+    }
+    return '${t.day}/${t.month}';
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final chats = ref.watch(chatListProvider);
+    final users = ref.watch(usersProvider).value ?? <AppUser>[];
+    final myUid = FirebaseAuth.instance.currentUser!.uid;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('ونس'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.account_circle_outlined),
+            onPressed: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const ProfileScreen())),
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () => ref.read(authRepositoryProvider).signOut(),
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => Navigator.of(
+          context,
+        ).push(MaterialPageRoute(builder: (_) => const UsersScreen())),
+        child: const Icon(Icons.edit_rounded),
+      ),
+      body: chats.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text('خطأ: $e')),
+        data: (list) {
+          if (list.isEmpty) {
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Text(
+                  'مفيش محادثات لسه.\nاضغط على القلم تحت وابدأ محادثة 👋',
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            );
+          }
+          return ListView.separated(
+            itemCount: list.length,
+            separatorBuilder: (context, index) => const Divider(height: 1),
+            itemBuilder: (context, i) {
+              final c = list[i];
+              final other = users.where((u) => u.uid == c.otherUid).firstOrNull;
+              final name = other == null
+                  ? '...'
+                  : (other.name.isEmpty ? other.email : other.name);
+              final preview = c.lastSenderId == myUid
+                  ? 'أنت: ${c.lastMessage}'
+                  : c.lastMessage;
+              return ListTile(
+                leading: UserAvatar(name: name, photoB64: other?.photoB64),
+                title: Text(name),
+                subtitle: Text(
+                  preview,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                trailing: Text(
+                  _time(c.updatedAt),
+                  style: Theme.of(context).textTheme.labelSmall,
+                ),
+                onTap: other == null
+                    ? null
+                    : () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => ChatScreen(other: other),
+                        ),
+                      ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
