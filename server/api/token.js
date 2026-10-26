@@ -1,5 +1,9 @@
-import { RtcTokenBuilder, RtcRole } from 'agora-token';
+import * as agoraPkg from 'agora-token';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
+
+// يشتغل سواء المكتبة CommonJS أو ES Module
+const agora = agoraPkg.default ?? agoraPkg;
+const { RtcTokenBuilder, RtcRole } = agora;
 
 const PROJECT_ID = process.env.FIREBASE_PROJECT_ID || 'wanas-chat-ali';
 
