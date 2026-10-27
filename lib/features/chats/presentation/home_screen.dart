@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/widgets/user_avatar.dart';
 import '../../auth/data/auth_repository.dart';
+import '../../contacts/contacts_repository.dart';
 import '../../profile/presentation/profile_screen.dart';
 import '../data/chat_list.dart';
 import '../data/chat_repository.dart';
@@ -30,19 +31,21 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final chats = ref.watch(chatListProvider);
-    final users = ref.watch(usersProvider).value ?? <AppUser>[];
+    final contacts = ref.watch(contactsProvider).value ?? <Contact>[];
+    final savedNames = {for (final c in contacts) c.uid: c.savedName};
     final myUid = FirebaseAuth.instance.currentUser!.uid;
-          ref.listen<AsyncValue<Call?>>(incomingCallProvider, (prev, next) {
-        final call = next.value;
-        if (call != null && prev?.value?.id != call.id) {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              fullscreenDialog: true,
-              builder: (_) => IncomingCallScreen(call: call),
-            ),
-          );
-        }
-      });
+
+    ref.listen<AsyncValue<Call?>>(incomingCallProvider, (prev, next) {
+      final call = next.value;
+      if (call != null && prev?.value?.id != call.id) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            fullscreenDialog: true,
+            builder: (_) => IncomingCallScreen(call: call),
+          ),
+        );
+      }
+    });
 
     return Scaffold(
       appBar: AppBar(
@@ -86,37 +89,72 @@ class HomeScreen extends ConsumerWidget {
             separatorBuilder: (context, index) => const Divider(height: 1),
             itemBuilder: (context, i) {
               final c = list[i];
-              final other = users.where((u) => u.uid == c.otherUid).firstOrNull;
-              final name = other == null
-                  ? '...'
-                  : (other.name.isEmpty ? other.email : other.name);
-              final preview = c.lastSenderId == myUid
-                  ? 'أنت: ${c.lastMessage}'
-                  : c.lastMessage;
-              return ListTile(
-                leading: UserAvatar(name: name, photoB64: other?.photoB64),
-                title: Text(name),
-                subtitle: Text(
-                  preview,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                trailing: Text(
-                  _time(c.updatedAt),
-                  style: Theme.of(context).textTheme.labelSmall,
-                ),
-                onTap: other == null
-                    ? null
-                    : () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => ChatScreen(other: other),
-                        ),
-                      ),
+              return _ChatTile(
+                chat: c,
+                savedName: savedNames[c.otherUid],
+                myUid: myUid,
+                time: _time(c.updatedAt),
               );
             },
           );
         },
       ),
+    );
+  }
+}
+
+class _ChatTile extends ConsumerWidget {
+  const _ChatTile({
+    required this.chat,
+    required this.savedName,
+    required this.myUid,
+    required this.time,
+  });
+
+  final ChatSummary chat;
+  final String? savedName;
+  final String myUid;
+  final String time;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // بنجيب بيانات الشخص ده بس (مش كل المستخدمين)
+    final other = ref.watch(userByIdProvider(chat.otherUid)).value;
+    final name = (savedName != null && savedName!.isNotEmpty)
+        ? savedName!
+        : (other == null
+            ? '...'
+            : (other.name.isEmpty ? 'مستخدم' : other.name));
+    final preview =
+        chat.lastSenderId == myUid ? 'أنت: ${chat.lastMessage}' : chat.lastMessage;
+
+    return ListTile(
+      leading: UserAvatar(name: name, photoB64: other?.photoB64),
+      title: Text(name),
+      subtitle: Text(
+        preview,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      trailing: Text(
+        time,
+        style: Theme.of(context).textTheme.labelSmall,
+      ),
+      onTap: other == null
+          ? null
+          : () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => ChatScreen(
+                    other: AppUser(
+                      uid: other.uid,
+                      name: name,
+                      email: '',
+                      bio: other.bio,
+                      photoB64: other.photoB64,
+                    ),
+                  ),
+                ),
+              ),
     );
   }
 }

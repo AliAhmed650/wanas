@@ -7,7 +7,22 @@ class AuthRepository {
   final FirebaseAuth _auth;
   final FirebaseFirestore _db;
 
-  Stream<User?> authStateChanges() => _auth.authStateChanges();
+  Stream<User?> authStateChanges() => _auth.authStateChanges().map((u) {
+        if (u != null) _ensureSearchField(u);
+        return u;
+      });
+
+  // الحسابات القديمة بتاخد حقل البحث تلقائياً أول ما صاحبها يفتح التطبيق
+  Future<void> _ensureSearchField(User u) async {
+    final name = (u.displayName ?? '').trim();
+    if (name.isEmpty) return;
+    try {
+      await _db.collection('users').doc(u.uid).set(
+        {'nameLower': name.toLowerCase()},
+        SetOptions(merge: true),
+      );
+    } catch (_) {}
+  }
 
   Future<void> signIn(String email, String password) =>
       _auth.signInWithEmailAndPassword(email: email, password: password);
@@ -21,6 +36,7 @@ class AuthRepository {
     await _db.collection('users').doc(user.uid).set({
       'uid': user.uid,
       'name': name,
+      'nameLower': name.trim().toLowerCase(),
       'bio': '',
       'photoUrl': null,
       'createdAt': FieldValue.serverTimestamp(),

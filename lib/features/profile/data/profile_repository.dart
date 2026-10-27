@@ -22,6 +22,7 @@ class ProfileRepository {
     await user.updateDisplayName(name);
     await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
       'name': name,
+      'nameLower': name.trim().toLowerCase(),
       'bio': bio,
       'email': FieldValue.delete(),
       'photoB64': ?photoB64,

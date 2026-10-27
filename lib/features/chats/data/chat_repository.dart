@@ -34,6 +34,7 @@ class Message {
     this.createdAt,
     this.status = 'sent',
     this.pending = false,
+    this.edited = false,
   });
 
   final String id;
@@ -42,6 +43,7 @@ class Message {
   final DateTime? createdAt;
   final String status; // sent | read
   final bool pending; // لسه ماوصلش السيرفر
+  final bool edited; // اتعدّلت بعد الإرسال
 
   factory Message.fromDoc(DocumentSnapshot<Map<String, dynamic>> d) {
     final m = d.data() ?? {};
@@ -52,6 +54,7 @@ class Message {
       createdAt: (m['createdAt'] as Timestamp?)?.toDate(),
       status: m['status'] ?? 'sent',
       pending: d.metadata.hasPendingWrites,
+      edited: m['edited'] == true,
     );
   }
 }
@@ -107,6 +110,25 @@ class ChatRepository {
       'lastSenderId': senderId,
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
+    await batch.commit();
+  }
+
+  /// تعديل نص رسالة بعتّها. لو هي آخر رسالة بنحدّث معاينة قايمة المحادثات كمان
+  Future<void> editMessage({
+    required String chatId,
+    required String messageId,
+    required String text,
+    required bool isLast,
+  }) async {
+    final chatRef = _db.collection('chats').doc(chatId);
+    final batch = _db.batch();
+    batch.update(chatRef.collection('messages').doc(messageId), {
+      'text': text,
+      'edited': true,
+    });
+    if (isLast) {
+      batch.update(chatRef, {'lastMessage': text});
+    }
     await batch.commit();
   }
 

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/widgets/user_avatar.dart';
 import '../data/chat_repository.dart';
@@ -67,25 +68,99 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       text: text,
     );
   }
-    Future<void> _startCall(bool video) async {
-      final me = FirebaseAuth.instance.currentUser!;
-      final callId = await ref.read(callRepositoryProvider).startCall(
-            calleeId: widget.other.uid,
-            callerName: me.displayName ?? 'مستخدم',
-            video: video,
-          );
-      if (!mounted) return;
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => CallScreen(
-            callId: callId,
-            otherName: widget.other.name,
-            video: video,
-            isCaller: true,
-          ),
+
+  Future<void> _startCall(bool video) async {
+    final me = FirebaseAuth.instance.currentUser!;
+    final callId = await ref.read(callRepositoryProvider).startCall(
+          calleeId: widget.other.uid,
+          callerName: me.displayName ?? 'مستخدم',
+          video: video,
+        );
+    if (!mounted) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CallScreen(
+          callId: callId,
+          otherName: widget.other.name,
+          video: video,
+          isCaller: true,
         ),
+      ),
+    );
+  }
+
+  // ضغطة مطولة على رسالة: نسخ للكل، وتعديل لرسايلك إنت
+  void _onLongPress(Message msg, bool isLast) {
+    if (msg.pending) return;
+    final mine = msg.senderId == _myUid;
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.copy),
+              title: const Text('نسخ'),
+              onTap: () {
+                Navigator.pop(ctx);
+                Clipboard.setData(ClipboardData(text: msg.text));
+              },
+            ),
+            if (mine)
+              ListTile(
+                leading: const Icon(Icons.edit),
+                title: const Text('تعديل'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _editMessage(msg, isLast);
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _editMessage(Message msg, bool isLast) async {
+    final ctrl = TextEditingController(text: msg.text);
+    final newText = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('تعديل الرسالة'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          minLines: 1,
+          maxLines: 5,
+          maxLength: 4000,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            child: const Text('حفظ'),
+          ),
+        ],
+      ),
+    );
+    if (newText == null || newText.isEmpty || newText == msg.text) return;
+    try {
+      await _repo.editMessage(
+        chatId: _chatId,
+        messageId: msg.id,
+        text: newText,
+        isLast: isLast,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر تعديل الرسالة: $e')),
       );
     }
+  }
 
   String _time(DateTime? t) {
     if (t == null) return '';
@@ -125,7 +200,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     return Scaffold(
       appBar: AppBar(
-                actions: [
+        actions: [
           IconButton(
             icon: const Icon(Icons.call),
             onPressed: () => _startCall(false),
@@ -182,45 +257,57 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   itemBuilder: (context, i) {
                     final msg = list[i];
                     final mine = msg.senderId == _myUid;
+                    final isLast = i == 0; // القايمة مرتبة من الأحدث
                     return Align(
                       alignment:
                           mine ? Alignment.centerRight : Alignment.centerLeft,
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(vertical: 3),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 8),
-                        constraints: BoxConstraints(
-                            maxWidth:
-                                MediaQuery.of(context).size.width * 0.75),
-                        decoration: BoxDecoration(
-                          color: mine
-                              ? scheme.primaryContainer
-                              : scheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(msg.text),
-                            const SizedBox(height: 2),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  _time(msg.createdAt),
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .labelSmall
-                                      ?.copyWith(color: scheme.outline),
-                                ),
-                                if (mine) ...[
-                                  const SizedBox(width: 4),
-                                  _ticks(msg, scheme),
+                      child: GestureDetector(
+                        onLongPress: () => _onLongPress(msg, isLast),
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 8),
+                          constraints: BoxConstraints(
+                              maxWidth:
+                                  MediaQuery.of(context).size.width * 0.75),
+                          decoration: BoxDecoration(
+                            color: mine
+                                ? scheme.primaryContainer
+                                : scheme.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(msg.text),
+                              const SizedBox(height: 2),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (msg.edited)
+                                    Text(
+                                      'معدّلة · ',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .labelSmall
+                                          ?.copyWith(color: scheme.outline),
+                                    ),
+                                  Text(
+                                    _time(msg.createdAt),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelSmall
+                                        ?.copyWith(color: scheme.outline),
+                                  ),
+                                  if (mine) ...[
+                                    const SizedBox(width: 4),
+                                    _ticks(msg, scheme),
+                                  ],
                                 ],
-                              ],
-                            ),
-                          ],
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     );

@@ -1,13 +1,16 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
 import '../../../core/widgets/user_avatar.dart';
 import '../agora_config.dart';
 import '../data/call_repository.dart';
-
+import '../call_foreground.dart';
 class CallScreen extends ConsumerStatefulWidget {
   const CallScreen({
     super.key,
@@ -42,6 +45,7 @@ class _CallScreenState extends ConsumerState<CallScreen> {
   bool _cameraOff = false;
   late bool _speaker = widget.video;
   bool _closed = false;
+  String? _error;
 
   @override
   void initState() {
@@ -60,6 +64,7 @@ class _CallScreenState extends ConsumerState<CallScreen> {
     _sub?.cancel();
     _ringTimeout?.cancel();
     _ticker?.cancel();
+    CallForeground.stop();
     final e = _engine;
     if (e != null) _releaseEngine(e);
     super.dispose();
@@ -90,87 +95,134 @@ class _CallScreenState extends ConsumerState<CallScreen> {
     } catch (_) {}
   }
 
+  void _showError(String text) {
+    debugPrint('Agora: $text');
+    if (mounted) setState(() => _error = text);
+  }
+
+  // بيطلب token من سيرفر ونس بعد ما يثبت إنك مسجّل دخول
+  Future<String> _fetchToken() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw Exception('غير مسجل دخول');
+    final idToken = await user.getIdToken();
+    final res = await http
+        .post(
+          Uri.parse(tokenServerUrl),
+          headers: {
+            'Authorization': 'Bearer $idToken',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({'channel': widget.callId}),
+        )
+        .timeout(const Duration(seconds: 20));
+    if (res.statusCode != 200) {
+      throw Exception('السيرفر رد ${res.statusCode}');
+    }
+    return jsonDecode(res.body)['token'] as String;
+  }
+
   Future<void> _init() async {
-    final perms = [Permission.microphone, if (widget.video) Permission.camera];
-    final result = await perms.request();
-    if (result.values.any((s) => !s.isGranted)) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('محتاج إذن الميكروفون والكاميرا')),
-        );
-      }
-      await _end();
-      return;
-    }
-    if (!mounted) return;
-
-    final engine = createAgoraRtcEngine();
-    await engine.initialize(RtcEngineContext(
-      appId: agoraAppId,
-      channelProfile: ChannelProfileType.channelProfileCommunication,
-    ));
-    if (!mounted) {
-      await _releaseEngine(engine);
-      return;
-    }
-
-    engine.registerEventHandler(RtcEngineEventHandler(
-      onUserJoined: (connection, remoteUid, elapsed) {
-        if (!mounted) return;
-        _ringTimeout?.cancel();
-        _ticker?.cancel();
-        _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-          if (mounted) setState(() => _seconds++);
-        });
-        setState(() {
-          _remoteController = VideoViewController.remote(
-            rtcEngine: engine,
-            canvas: VideoCanvas(uid: remoteUid),
-            connection: RtcConnection(channelId: widget.callId),
+    try {
+      final perms = [
+        Permission.microphone,
+        if (widget.video) Permission.camera,
+      ];
+      final result = await perms.request();
+      if (result.values.any((s) => !s.isGranted)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('محتاج إذن الميكروفون والكاميرا')),
           );
-          _remoteUid = remoteUid;
-        });
-      },
-      onUserOffline: (connection, remoteUid, reason) {
-        if (mounted) _end();
-      },
-      onError: (err, msg) => debugPrint('Agora error: $err $msg'),
-    ));
-
-    if (widget.video) {
-      await engine.enableVideo();
-      await engine.startPreview();
-    } else {
-      await engine.enableAudio();
-    }
-    await engine.setEnableSpeakerphone(_speaker);
-
-    if (!mounted) {
-      await _releaseEngine(engine);
-      return;
-    }
-    setState(() {
-      _engine = engine;
-      if (widget.video) {
-        _localController = VideoViewController(
-          rtcEngine: engine,
-          canvas: const VideoCanvas(uid: 0),
-        );
+        }
+        await _end();
+        return;
       }
-    });
+      if (!mounted) return;
+      await CallForeground.start(
+          widget.otherName.isEmpty ? 'مستخدم' : widget.otherName);
 
-    await engine.joinChannel(
-      token: '',
-      channelId: widget.callId,
-      uid: 0,
-      options: ChannelMediaOptions(
-        autoSubscribeAudio: true,
-        autoSubscribeVideo: widget.video,
-        publishMicrophoneTrack: true,
-        publishCameraTrack: widget.video,
-        clientRoleType: ClientRoleType.clientRoleBroadcaster,
-      ),
-    );
+      final engine = createAgoraRtcEngine();
+      await engine.initialize(RtcEngineContext(
+        appId: agoraAppId,
+        channelProfile: ChannelProfileType.channelProfileCommunication,
+      ));
+      if (!mounted) {
+        await _releaseEngine(engine);
+        return;
+      }
+
+      engine.registerEventHandler(RtcEngineEventHandler(
+        onJoinChannelSuccess: (connection, elapsed) {
+          debugPrint('Agora: joined channel ${connection.channelId}');
+        },
+        onUserJoined: (connection, remoteUid, elapsed) {
+          if (!mounted) return;
+          _ringTimeout?.cancel();
+          _ticker?.cancel();
+          _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+            if (mounted) setState(() => _seconds++);
+          });
+          setState(() {
+            _remoteController = VideoViewController.remote(
+              rtcEngine: engine,
+              canvas: VideoCanvas(uid: remoteUid),
+              connection: RtcConnection(channelId: widget.callId),
+            );
+            _remoteUid = remoteUid;
+          });
+        },
+        onUserOffline: (connection, remoteUid, reason) {
+          if (mounted) _end();
+        },
+        onError: (err, msg) => _showError('خطأ Agora: $err $msg'),
+      ));
+
+      if (widget.video) {
+        await engine.enableVideo();
+        await engine.startPreview();
+      } else {
+        await engine.enableAudio();
+      }
+
+      if (!mounted) {
+        await _releaseEngine(engine);
+        return;
+      }
+      setState(() {
+        _engine = engine;
+        if (widget.video) {
+          _localController = VideoViewController(
+            rtcEngine: engine,
+            canvas: const VideoCanvas(uid: 0),
+          );
+        }
+      });
+
+      final token = await _fetchToken();
+      if (!mounted) return;
+
+      await engine.joinChannel(
+        token: token,
+        channelId: widget.callId,
+        uid: 0,
+        options: ChannelMediaOptions(
+          autoSubscribeAudio: true,
+          autoSubscribeVideo: widget.video,
+          publishMicrophoneTrack: true,
+          publishCameraTrack: widget.video,
+          clientRoleType: ClientRoleType.clientRoleBroadcaster,
+        ),
+      );
+
+      // السماعة بعد الـ join، ولو فشلت مش مشكلة
+      try {
+        await engine.setEnableSpeakerphone(_speaker);
+      } catch (e) {
+        debugPrint('Agora speaker: $e');
+      }
+    } catch (e) {
+      _showError('تعذر بدء المكالمة: $e');
+    }
   }
 
   Future<void> _toggleMute() async {
@@ -185,7 +237,9 @@ class _CallScreenState extends ConsumerState<CallScreen> {
 
   Future<void> _toggleSpeaker() async {
     setState(() => _speaker = !_speaker);
-    await _engine?.setEnableSpeakerphone(_speaker);
+    try {
+      await _engine?.setEnableSpeakerphone(_speaker);
+    } catch (_) {}
   }
 
   String get _statusText {
@@ -228,6 +282,14 @@ class _CallScreenState extends ConsumerState<CallScreen> {
                     Text(_statusText,
                         style: const TextStyle(
                             color: Colors.white70, fontSize: 16)),
+                    if (_error != null)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+                        child: Text(_error!,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                                color: Colors.orangeAccent, fontSize: 13)),
+                      ),
                   ],
                 ),
               ),
