@@ -1,3 +1,8 @@
+// ignore_for_file: deprecated_member_use
+// getToken/onTokenRefresh متعلّم عليهم deprecated في firebase_messaging 17،
+// والبديل (register/onRegistered) بيرجّع Firebase Installation ID (FID) مش
+// FCM token. سيرفر الإشعارات (server/api/notify.js) بيبعت على FCM token، فبنفضل
+// على الدوال دي لحد ما نتأكد إن الإرسال بالـ FID مدعوم في firebase-admin.
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
