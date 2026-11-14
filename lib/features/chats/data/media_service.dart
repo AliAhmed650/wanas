@@ -17,7 +17,7 @@ MessageType messageTypeFromString(String? s) {
   return MessageType.text;
 }
 
-/// الحد الأقصى لحجم أي مرفق (بالبايت). لازم يتطابق مع storage.rules
+/// الحد الأقصى لحجم أي مرفق (بالبايت). وده نفس حد الـ bucket في Supabase (50 ميجا)
 const int kMaxUploadBytes = 50 * 1024 * 1024;
 
 /// ملف جاهز للرفع: اسم + نوع + حجم + طريقة لقراءة البيانات.
@@ -146,7 +146,10 @@ class MediaService {
     final Object body;
     final headers = <String, Object>{
       'apikey': SupabaseConfig.anonKey,
-      'Authorization': 'Bearer ${SupabaseConfig.anonKey}',
+      // المفاتيح الجديدة (sb_publishable_...) بتتبعت في apikey بس.
+      // الـ Bearer للمفاتيح القديمة (JWT بيبدأ بـ eyJ) بس.
+      if (SupabaseConfig.anonKey.startsWith('eyJ'))
+        'Authorization': 'Bearer ${SupabaseConfig.anonKey}',
       'x-upsert': 'false',
       'Cache-Control': 'max-age=31536000',
     };

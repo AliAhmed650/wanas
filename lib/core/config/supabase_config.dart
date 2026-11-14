@@ -5,7 +5,7 @@
 /// خد القيمتين من: Supabase Dashboard ← Project Settings ← API.
 class SupabaseConfig {
   /// مثال: https://abcdefghijklmno.supabase.co
-  static const String url = 'wtsopfvekdxlehrvtnbm.co';
+  static const String url = 'https://wtsopfvekdxlehrvtnbm.supabase.co';
 
   /// الـ "anon public" key (ماتحطش الـ service_role key هنا أبدًا)
   static const String anonKey = 'sb_publishable_SEwKBg9jq0W4I0602VxBoA_x8SpfVcZ';
