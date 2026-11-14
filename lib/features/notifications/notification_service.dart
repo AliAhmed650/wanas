@@ -30,10 +30,17 @@ class NotificationService {
   /// بيتنادى بعد تسجيل الدخول (آمن لو اتنادى أكتر من مرة)
   static Future<void> init(String uid) async {
     try {
+      debugPrint('FCM[1/4] init for uid=$uid');
       final settings = await _fm.requestPermission();
-      if (settings.authorizationStatus == AuthorizationStatus.denied) return;
+      debugPrint('FCM[2/4] permission = ${settings.authorizationStatus}');
+      if (settings.authorizationStatus == AuthorizationStatus.denied) {
+        debugPrint('FCM: إذن الإشعارات مرفوض. فعّله من إعدادات الموبايل.');
+        return;
+      }
 
       final token = await _fm.getToken();
+      debugPrint('FCM[3/4] token = '
+          '${token == null ? 'NULL (مفيش توكن)' : '${token.substring(0, 12)}... (${token.length} حرف)'}');
       if (token != null) await _save(uid, token);
 
       await _refreshSub?.cancel();
@@ -51,16 +58,21 @@ class NotificationService {
           await _open(initial);
         }
       }
-    } catch (e) {
-      debugPrint('notifications init failed: $e');
+    } catch (e, st) {
+      debugPrint('FCM ERROR in init: $e\n$st');
     }
   }
 
   static Future<void> _save(String uid, String token) async {
     _token = token;
-    await _db.collection('users').doc(uid).set({
-      'fcmTokens': FieldValue.arrayUnion([token]),
-    }, SetOptions(merge: true));
+    try {
+      await _db.collection('users').doc(uid).set({
+        'fcmTokens': FieldValue.arrayUnion([token]),
+      }, SetOptions(merge: true));
+      debugPrint('FCM[4/4] token saved to Firestore for uid=$uid');
+    } catch (e) {
+      debugPrint('FCM ERROR saving token: $e');
+    }
   }
 
   /// بيتنادى قبل تسجيل الخروج: بنشيل توكن الجهاز ده من الحساب،
