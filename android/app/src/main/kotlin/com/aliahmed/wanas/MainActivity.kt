@@ -30,7 +30,7 @@ class MainActivity : FlutterActivity() {
         val ringtone = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
         val attrs = AudioAttributes.Builder()
             .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
-            .setContentType(AudioAttributes.CONTENT_TYPE_SONIC)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
             .build()
         val calls = NotificationChannel(
             "calls", "المكالمات", NotificationManager.IMPORTANCE_HIGH
