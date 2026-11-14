@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'media_service.dart';
+import '../../notifications/notify_api.dart';
 
 class AppUser {
   AppUser({
@@ -145,6 +148,8 @@ class ChatRepository {
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
     await batch.commit();
+    // الإشعار مش بيستنى: لو فشل الرسالة نفسها وصلت
+    unawaited(NotifyApi.message(toUid: receiverId, chatId: chatId));
   }
 
   /// بيبعت رسالة مرفق (صورة/فيديو/صوت/ملف) بعد ما الرفع يخلص
@@ -181,6 +186,8 @@ class ChatRepository {
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
     await batch.commit();
+    // الإشعار مش بيستنى: لو فشل الرسالة نفسها وصلت
+    unawaited(NotifyApi.message(toUid: receiverId, chatId: chatId));
   }
 
   /// تعديل نص رسالة بعتّها. لو هي آخر رسالة بنحدّث معاينة قايمة المحادثات كمان

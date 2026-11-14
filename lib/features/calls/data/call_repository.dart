@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../notifications/notify_api.dart';
 
 class Call {
   Call({
@@ -53,6 +57,8 @@ class CallRepository {
       'status': 'ringing',
       'createdAt': FieldValue.serverTimestamp(),
     });
+    // إشعار "فلان بيرن عليك" للطرف التاني (حتى لو التطبيق مقفول عنده)
+    unawaited(NotifyApi.call(toUid: calleeId, callId: ref.id));
     return ref.id;
   }
 

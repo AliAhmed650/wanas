@@ -5,6 +5,7 @@ import 'core/theme/app_theme.dart';
 import 'features/auth/data/auth_repository.dart';
 import 'features/auth/presentation/login_screen.dart';
 import 'features/chats/presentation/home_screen.dart';
+import 'features/notifications/notification_service.dart';
 import 'firebase_options.dart';
 
 Future<void> main() async {
@@ -19,6 +20,7 @@ class WanasApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       title: 'ونس',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,

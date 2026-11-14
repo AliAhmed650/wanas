@@ -2,13 +2,18 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../notifications/notification_service.dart';
+
 class AuthRepository {
   AuthRepository(this._auth, this._db);
   final FirebaseAuth _auth;
   final FirebaseFirestore _db;
 
   Stream<User?> authStateChanges() => _auth.authStateChanges().map((u) {
-        if (u != null) _ensureSearchField(u);
+        if (u != null) {
+          _ensureSearchField(u);
+          NotificationService.init(u.uid);
+        }
         return u;
       });
 
@@ -43,7 +48,11 @@ class AuthRepository {
     });
   }
 
-  Future<void> signOut() => _auth.signOut();
+  Future<void> signOut() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid != null) await NotificationService.clear(uid);
+    await _auth.signOut();
+  }
 }
 
 final authRepositoryProvider = Provider(
