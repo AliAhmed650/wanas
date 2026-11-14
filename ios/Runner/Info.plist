@@ -24,6 +24,12 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>نحتاج الميكروفون لتسجيل الرسائل الصوتية والمكالمات.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>نحتاج الكاميرا لتصوير الصور والفيديوهات ومكالمات الفيديو.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>نحتاج الوصول للصور والفيديوهات عشان تقدر تبعتها في المحادثة.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

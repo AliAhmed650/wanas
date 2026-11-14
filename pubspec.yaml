@@ -45,8 +45,16 @@ dependencies:
   agora_rtc_engine: ^6.6.4
   permission_handler: ^13.0.2
   http: ^1.6.0
+  dio: ^5.7.0
   flutter_foreground_task: ^11.0.3
   crypto: ^3.0.8
+  # الميديا في الشات: تسجيل صوت، تشغيل صوت/فيديو، اختيار ملفات، فتح الملفات
+  record: ^7.1.2
+  audioplayers: ^6.8.1
+  video_player: ^2.11.0
+  file_picker: ^12.3.0
+  path_provider: ^2.1.5
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:

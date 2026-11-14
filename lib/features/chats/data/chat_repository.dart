@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'media_service.dart';
 
 class AppUser {
   AppUser({
@@ -35,15 +36,27 @@ class Message {
     this.status = 'sent',
     this.pending = false,
     this.edited = false,
+    this.type = MessageType.text,
+    this.url,
+    this.fileName,
+    this.fileSize,
+    this.durationMs,
   });
 
   final String id;
   final String senderId;
-  final String text;
+  final String text; // نص الرسالة، أو الكابشن لو مرفق
   final DateTime? createdAt;
   final String status; // sent | read
   final bool pending; // لسه ماوصلش السيرفر
   final bool edited; // اتعدّلت بعد الإرسال
+  final MessageType type;
+  final String? url; // رابط المرفق (لو الرسالة ميديا)
+  final String? fileName;
+  final int? fileSize;
+  final int? durationMs; // مدة الرسالة الصوتية
+
+  bool get isMedia => type != MessageType.text;
 
   factory Message.fromDoc(DocumentSnapshot<Map<String, dynamic>> d) {
     final m = d.data() ?? {};
@@ -55,7 +68,28 @@ class Message {
       status: m['status'] ?? 'sent',
       pending: d.metadata.hasPendingWrites,
       edited: m['edited'] == true,
+      type: messageTypeFromString(m['type'] as String?),
+      url: m['url'] as String?,
+      fileName: m['fileName'] as String?,
+      fileSize: (m['fileSize'] as num?)?.toInt(),
+      durationMs: (m['durationMs'] as num?)?.toInt(),
     );
+  }
+}
+
+/// المعاينة اللي بتظهر في قايمة المحادثات لآخر رسالة
+String previewFor(MessageType type, String text, {String? fileName}) {
+  switch (type) {
+    case MessageType.text:
+      return text;
+    case MessageType.image:
+      return text.isEmpty ? '📷 صورة' : '📷 $text';
+    case MessageType.video:
+      return text.isEmpty ? '🎥 فيديو' : '🎥 $text';
+    case MessageType.audio:
+      return '🎤 رسالة صوتية';
+    case MessageType.file:
+      return '📎 ${fileName ?? 'ملف'}';
   }
 }
 
@@ -107,6 +141,42 @@ class ChatRepository {
     batch.set(chatRef, {
       'participants': [senderId, receiverId],
       'lastMessage': text,
+      'lastSenderId': senderId,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+    await batch.commit();
+  }
+
+  /// بيبعت رسالة مرفق (صورة/فيديو/صوت/ملف) بعد ما الرفع يخلص
+  Future<void> sendMedia({
+    required String chatId,
+    required String senderId,
+    required String receiverId,
+    required MessageType type,
+    required String url,
+    required String storagePath,
+    required String fileName,
+    required int fileSize,
+    String caption = '',
+    int? durationMs,
+  }) async {
+    final chatRef = _db.collection('chats').doc(chatId);
+    final batch = _db.batch();
+    batch.set(chatRef.collection('messages').doc(), {
+      'senderId': senderId,
+      'type': type.name,
+      'text': caption,
+      'url': url,
+      'storagePath': storagePath,
+      'fileName': fileName,
+      'fileSize': fileSize,
+      'durationMs': ?durationMs,
+      'status': 'sent',
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    batch.set(chatRef, {
+      'participants': [senderId, receiverId],
+      'lastMessage': previewFor(type, caption, fileName: fileName),
       'lastSenderId': senderId,
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));

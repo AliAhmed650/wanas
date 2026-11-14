@@ -59,7 +59,27 @@ class HomeScreen extends ConsumerWidget {
           ),
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () => ref.read(authRepositoryProvider).signOut(),
+            tooltip: 'تسجيل الخروج',
+            onPressed: () async {
+              final ok = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('تسجيل الخروج'),
+                  content: const Text('متأكد إنك عايز تخرج من حسابك؟'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text('إلغاء'),
+                    ),
+                    FilledButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: const Text('خروج'),
+                    ),
+                  ],
+                ),
+              );
+              if (ok == true) ref.read(authRepositoryProvider).signOut();
+            },
           ),
         ],
       ),
@@ -74,19 +94,41 @@ class HomeScreen extends ConsumerWidget {
         error: (e, _) => Center(child: Text('خطأ: $e')),
         data: (list) {
           if (list.isEmpty) {
-            return const Center(
+            final scheme = Theme.of(context).colorScheme;
+            return Center(
               child: Padding(
-                padding: EdgeInsets.all(24),
-                child: Text(
-                  'مفيش محادثات لسه.\nاضغط على القلم تحت وابدأ محادثة 👋',
-                  textAlign: TextAlign.center,
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.chat_bubble_outline_rounded,
+                      size: 72,
+                      color: scheme.primary.withValues(alpha: 0.5),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'مفيش محادثات لسه',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'اضغط على القلم تحت وابدأ محادثة 👋',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: scheme.outline),
+                    ),
+                  ],
                 ),
               ),
             );
           }
           return ListView.separated(
             itemCount: list.length,
-            separatorBuilder: (context, index) => const Divider(height: 1),
+            separatorBuilder: (context, index) => const Divider(
+              height: 1,
+              indent: 80,
+              endIndent: 16,
+            ),
             itemBuilder: (context, i) {
               final c = list[i];
               return _ChatTile(
@@ -128,17 +170,27 @@ class _ChatTile extends ConsumerWidget {
     final preview =
         chat.lastSenderId == myUid ? 'أنت: ${chat.lastMessage}' : chat.lastMessage;
 
+    final scheme = Theme.of(context).colorScheme;
     return ListTile(
-      leading: UserAvatar(name: name, photoB64: other?.photoB64),
-      title: Text(name),
+      leading: UserAvatar(name: name, photoB64: other?.photoB64, radius: 26),
+      title: Text(
+        name,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+      ),
       subtitle: Text(
         preview,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
+        style: TextStyle(color: scheme.onSurfaceVariant),
       ),
       trailing: Text(
         time,
-        style: Theme.of(context).textTheme.labelSmall,
+        style: Theme.of(context)
+            .textTheme
+            .labelSmall
+            ?.copyWith(color: scheme.outline),
       ),
       onTap: other == null
           ? null

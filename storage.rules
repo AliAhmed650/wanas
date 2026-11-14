@@ -1,0 +1,18 @@
+rules_version = '2';
+
+// قواعد Firebase Storage لمرفقات الشات.
+// المسار: chats/{chatId}/{fileName} و chatId = "uidA_uidB" (مرتبين).
+// بس طرفين المحادثة يقدروا يقرأوا ويرفعوا، والحد الأقصى 50 ميجا
+// (لازم يتطابق مع kMaxUploadBytes في media_service.dart).
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /chats/{chatId}/{fileName} {
+      allow read: if request.auth != null
+                  && request.auth.uid in chatId.split('_');
+      allow create: if request.auth != null
+                    && request.auth.uid in chatId.split('_')
+                    && request.resource.size < 50 * 1024 * 1024;
+      allow update, delete: if false;
+    }
+  }
+}
